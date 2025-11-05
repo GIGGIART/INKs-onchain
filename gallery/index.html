@@ -194,7 +194,7 @@
   <header>
     <h1>INKs Gallery <span class="badge">Bitcoin Ordinals</span></h1>
     <div class="filters">
-      <input id="search" type="search" placeholder="Search by name or inscription id…" />
+      <input id="search" type="search" placeholder="Search by name, id or URL…" />
       <select id="shapeFilter">
         <option value="">All shapes</option>
       </select>
@@ -207,7 +207,7 @@
   </main>
 
   <footer>
-    <span class="pill">Data source: data/INKs_traits.json · Previews from ordinals.com</span>
+    <span class="pill">Data: data/INKs_traits.json · Using pre-fetched previewUrl from ordinals.com</span>
   </footer>
 
   <script>
@@ -216,32 +216,21 @@
     const SEARCH = document.getElementById("search");
     const SHAPE = document.getElementById("shapeFilter");
 
-    // Base per ordinals
-    const ORD_BASE = "https://ordinals.com";
-
     let allInks = [];
     let filtered = [];
 
     async function loadInks() {
       try {
-        // Percorso al JSON dentro il repo
         const res = await fetch("../data/INKs_traits.json");
         if (!res.ok) throw new Error("Cannot load INKs_traits.json");
         const raw = await res.json();
 
-        // Normalizza varie possibili strutture:
-        // - array diretto
-        // - { items: [...] }
-        // - oggetto { id: { ... }, id2: { ... } }
         if (Array.isArray(raw)) {
           allInks = raw;
         } else if (Array.isArray(raw.items)) {
           allInks = raw.items;
         } else if (typeof raw === "object" && raw !== null) {
-          allInks = Object.entries(raw).map(([id, value]) => {
-            // se la struttura è { "<id>": { ...traits... } }
-            return { id, ...value };
-          });
+          allInks = Object.entries(raw).map(([id, value]) => ({ id, ...value }));
         } else {
           throw new Error("Unsupported JSON structure");
         }
@@ -252,80 +241,82 @@
       } catch (err) {
         console.error(err);
         EMPTY.style.display = "block";
-        EMPTY.textContent = "Error loading INKs JSON. Check data/INKs_traits.json path and structure.";
+        EMPTY.textContent = "Error loading INKs JSON. Check data/INKs_traits.json.";
       }
     }
 
-    // Prende l'inscription id da diverse possibili chiavi
-    function getInscriptionId(ink) {
-      return (
-        ink.inscription_id ||
-        ink.inscriptionId ||
-        ink.ordinal_id ||
-        ink.ordinalId ||
-        ink.id ||
-        (ink.meta && (ink.meta.inscription_id || ink.meta.id)) ||
-        null
-      );
-    }
-
-    // Nome visuale
-    function getName(ink) {
-      if (ink.name) return ink.name;
-      if (ink.meta && ink.meta.name) return ink.meta.name;
-      const id = getInscriptionId(ink);
-      if (id) return `INK ${String(id).slice(0, 8)}…`;
-      return "INK";
-    }
-
-    // Recupera un trait a partire da varie strutture possibili
-    function getAttr(ink, traitName) {
-      // 1) meta.attributes come array [{trait_type, value}]
-      if (ink.meta && Array.isArray(ink.meta.attributes)) {
-        const found = ink.meta.attributes.find(
-          (a) => a.trait_type === traitName || a.trait_type === traitName.toLowerCase()
-        );
-        if (found) return found.value;
+    function findOrdinalsUrl(obj) {
+      if (!obj || typeof obj !== "object") return null;
+      for (const value of Object.values(obj)) {
+        if (typeof value === "string" && value.includes("ordinals.com")) {
+          return value;
+        }
+        if (typeof value === "object") {
+          const nested = findOrdinalsUrl(value);
+          if (nested) return nested;
+        }
       }
-      // 2) traits: { traitName: value }
-      if (ink.traits && traitName in ink.traits) return ink.traits[traitName];
-      if (ink.traits && traitName.toLowerCase() in ink.traits) return ink.traits[traitName.toLowerCase()];
-      // 3) campo diretto sull'oggetto (Legs, Eyes, Season, Shape…)
-      if (traitName in ink) return ink[traitName];
-      if (traitName.toLowerCase() in ink) return ink[traitName.toLowerCase()];
-
       return null;
     }
 
-    // URL dell'immagine:
-    // - se c'è image o image_url, usa quella
-    // - se l'id è già un URL, usa quello
-    // - altrimenti costruisce ordinals.com/content/<id>
-    function getImageUrl(ink) {
-      if (ink.image) return ink.image;
-      if (ink.image_url) return ink.image_url;
-      const id = getInscriptionId(ink);
-      if (!id) return null;
-
-      const idStr = String(id);
-      if (idStr.startsWith("http://") || idStr.startsWith("https://")) {
-        return idStr;
+    function getInscriptionLink(ink) {
+      if (ink.previewUrl && ink.previewUrl.includes("ordinals.com")) {
+        // da preview -> inscription
+        try {
+          const u = new URL(ink.previewUrl);
+          if (u.pathname.includes("/preview/")) {
+            u.pathname = u.pathname.replace("/preview/", "/inscription/");
+          } else if (u.pathname.includes("/content/")) {
+            u.pathname = u.pathname.replace("/content/", "/inscription/");
+          }
+          return u.toString();
+        } catch {
+          return ink.previewUrl;
+        }
       }
-
-      return `${ORD_BASE}/content/${idStr}`;
+      const base = findOrdinalsUrl(ink);
+      if (!base) return "#";
+      try {
+        const u = new URL(base);
+        if (u.pathname.includes("/inscription/")) return u.toString();
+        if (u.pathname.includes("/content/")) {
+          u.pathname = u.pathname.replace("/content/", "/inscription/");
+          return u.toString();
+        }
+        if (u.pathname.includes("/preview/")) {
+          u.pathname = u.pathname.replace("/preview/", "/inscription/");
+          return u.toString();
+        }
+        return u.toString();
+      } catch {
+        return base;
+      }
     }
 
-    function getOrdinalLink(ink) {
-      const id = getInscriptionId(ink);
-      if (!id) return "#";
-      const idStr = String(id);
-      if (idStr.startsWith("http://") || idStr.startsWith("https://")) {
-        // Se l'id è già un link a ordinals, usalo così com'è
-        return idStr.includes("/inscription/")
-          ? idStr
-          : idStr.replace("/content/", "/inscription/");
+    function getName(ink) {
+      if (ink.name) return ink.name;
+      if (ink.meta && ink.meta.name) return ink.meta.name;
+      const url = ink.previewUrl || findOrdinalsUrl(ink) || "";
+      if (url) return `INK ${url.slice(-8)}`;
+      return "INK";
+    }
+
+    function getAttr(ink, traitName) {
+      if (ink.meta && Array.isArray(ink.meta.attributes)) {
+        const found = ink.meta.attributes.find(
+          (a) =>
+            a.trait_type === traitName ||
+            a.trait_type === traitName.toLowerCase()
+        );
+        if (found) return found.value;
       }
-      return `${ORD_BASE}/inscription/${idStr}`;
+      if (ink.traits && traitName in ink.traits) return ink.traits[traitName];
+      if (ink.traits && traitName.toLowerCase() in ink.traits) {
+        return ink.traits[traitName.toLowerCase()];
+      }
+      if (traitName in ink) return ink[traitName];
+      if (traitName.toLowerCase() in ink) return ink[traitName.toLowerCase()];
+      return null;
     }
 
     function buildShapeFilter() {
@@ -352,18 +343,12 @@
       EMPTY.style.display = "none";
 
       filtered.forEach((ink) => {
-        const id = getInscriptionId(ink);
-        const imgUrl = getImageUrl(ink);
+        const imgUrl = ink.previewUrl || findOrdinalsUrl(ink);
         const name = getName(ink);
         const shape = getAttr(ink, "Shape");
         const legs = getAttr(ink, "Legs");
         const eyes = getAttr(ink, "Eyes");
         const season = getAttr(ink, "Season");
-
-        if (!id) {
-          // se non abbiamo un id valido, saltiamo
-          return;
-        }
 
         const card = document.createElement("article");
         card.className = "card";
@@ -382,7 +367,7 @@
           };
           thumb.appendChild(img);
         } else {
-          thumb.textContent = "No image URL";
+          thumb.textContent = "No previewUrl";
         }
 
         const meta = document.createElement("div");
@@ -394,7 +379,6 @@
         const nameEl = document.createElement("div");
         nameEl.className = "name";
         nameEl.textContent = name;
-
         titleRow.appendChild(nameEl);
 
         if (shape) {
@@ -431,7 +415,7 @@
 
         const link = document.createElement("a");
         link.className = "open-link";
-        link.href = getOrdinalLink(ink);
+        link.href = getInscriptionLink(ink);
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = "Open on ordinals.com";
@@ -450,8 +434,8 @@
 
       filtered = allInks.filter((ink) => {
         const name = getName(ink).toLowerCase();
-        const id = String(getInscriptionId(ink) || "").toLowerCase();
-        const hasQuery = !q || name.includes(q) || id.includes(q);
+        const url = (ink.previewUrl || findOrdinalsUrl(ink) || "").toLowerCase();
+        const hasQuery = !q || name.includes(q) || url.includes(q);
 
         const inkShape = getAttr(ink, "Shape");
         const shapeMatch = !shapeVal || inkShape === shapeVal;
