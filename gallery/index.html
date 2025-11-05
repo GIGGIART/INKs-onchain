@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>INKs – On-Chain Gallery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0f0f10;
+      --card: #151518;
+      --accent: #d801ff;
+      --text: #f5f5f5;
+      --muted: #9a9aa0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1b1024 0, #050509 55%, #000 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(5,5,10,.9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(216,1,255,.25);
+      padding: .75rem 1rem;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      margin: 0;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    header h1 span.badge {
+      background: rgba(216,1,255,.18);
+      padding: .15rem .6rem;
+      border-radius: 999px;
+      font-size: .6rem;
+      color: var(--accent);
+    }
+    .filters {
+      display: flex;
+      gap: .5rem;
+      flex: 1;
+      min-width: 260px;
+    }
+    .filters input[type="search"],
+    .filters select {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.08);
+      color: inherit;
+      border-radius: 999px;
+      padding: .45rem .75rem;
+      font-size: .75rem;
+      outline: none;
+      width: 100%;
+    }
+    .filters input::placeholder { color: rgba(245,245,245,.4); }
+
+    main {
+      padding: 1rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(216,1,255,.0);
+      transition: transform .15s ease-out, border .15s ease-out, box-shadow .15s ease-out;
+      display: flex;
+      flex-direction: column;
+      min-height: 230px;
+      position: relative;
+      box-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border: 1px solid rgba(216,1,255,.6);
+      box-shadow: 0 12px 25px rgba(0,0,0,.65);
+    }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background:
+        radial-gradient(circle at top, rgba(216,1,255,.35), transparent 55%),
+        radial-gradient(circle at bottom, rgba(2,127,255,.25), transparent 60%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #050509;
+    }
+    .meta {
+      padding: .6rem .75rem .75rem;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+      flex: 1;
+    }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: .4rem;
+      align-items: center;
+    }
+    .name {
+      font-weight: 600;
+      font-size: .8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .shape-badge {
+      background: rgba(216,1,255,.18);
+      color: var(--accent);
+      font-size: .6rem;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      text-transform: capitalize;
+    }
+    .traits {
+      font-size: .6rem;
+      color: var(--muted);
+      display: flex;
+      gap: .35rem;
+      flex-wrap: wrap;
+      margin-top: .15rem;
+    }
+    .traits span {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.04);
+      border-radius: .35rem;
+      padding: .15rem .35rem;
+    }
+    .open-link {
+      margin-top: auto;
+      background: rgba(216,1,255,.08);
+      border: 1px solid rgba(216,1,255,.16);
+      border-radius: .6rem;
+      padding: .28rem .5rem;
+      font-size: .65rem;
+      text-align: center;
+      text-decoration: none;
+      color: var(--text);
+      transition: background .15s;
+    }
+    .open-link:hover {
+      background: rgba(216,1,255,.3);
+    }
+    .empty {
+      text-align: center;
+      color: rgba(245,245,245,.45);
+      padding: 2rem 0 3rem;
+      font-size: .85rem;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 1rem 3rem;
+      color: rgba(245,245,245,.35);
+      font-size: .7rem;
+    }
+    .pill {
+      font-size: .7rem;
+      border-radius: 999px;
+      padding: .15rem .6rem;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.35);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>INKs Gallery <span class="badge">Bitcoin Ordinals</span></h1>
+    <div class="filters">
+      <input id="search" type="search" placeholder="Search by name or inscription id…" />
+      <select id="shapeFilter">
+        <option value="">All shapes</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div id="grid" class="grid" aria-live="polite"></div>
+    <div id="empty" class="empty" style="display:none;">No INKs found 👀</div>
+  </main>
+
+  <footer>
+    <span class="pill">Data source: data/INKs_traits.json · Previews from ordinals.com</span>
+  </footer>
+
+  <script>
+    const GRID = document.getElementById("grid");
+    const EMPTY = document.getElementById("empty");
+    const SEARCH = document.getElementById("search");
+    const SHAPE = document.getElementById("shapeFilter");
+
+    const ORD_BASE = "https://ordinals.com";
+
+    let allInks = [];
+    let filtered = [];
+
+    async function loadInks() {
+      try {
+        // JSON path inside the same repo
+        const res = await fetch("../data/INKs_traits.json");
+        if (!res.ok) throw new Error("Cannot load INKs_traits.json");
+        const data = await res.json();
+
+        // Support either {items:[...]} or plain array [...]
+        allInks = Array.isArray(data) ? data : (data.items || []);
+        filtered = [...allInks];
+
+        buildShapeFilter();
+        renderGrid();
+      } catch (err) {
+        console.error(err);
+        EMPTY.style.display = "block";
+        EMPTY.textContent = "Error loading INKs JSON. Check data/INKs_traits.json path.";
+      }
+    }
+
+    function getAttr(ink, traitName) {
+      const attrs = ink.meta && Array.isArray(ink.meta.attributes)
+        ? ink.meta.attributes
+        : [];
+      const found = attrs.find(a => a.trait_type === traitName);
+      return found ? found.value : null;
+    }
+
+    function buildShapeFilter() {
+      const shapes = new Set();
+      allInks.forEach(ink => {
+        const shape = getAttr(ink, "Shape");
+        if (shape) shapes.add(shape);
+      });
+      const sorted = Array.from(shapes).sort();
+      sorted.forEach(shape => {
+        const opt = document.createElement("option");
+        opt.value = shape;
+        opt.textContent = shape;
+        SHAPE.appendChild(opt);
+      });
+    }
+
+    function renderGrid() {
+      GRID.innerHTML = "";
+      if (!filtered.length) {
+        EMPTY.style.display = "block";
+        return;
+      }
+      EMPTY.style.display = "none";
+
+      filtered.forEach(ink => {
+        const id = ink.id;
+        const name = ink.meta?.name || id;
+        const shape = getAttr(ink, "Shape");
+        const legs = getAttr(ink, "Legs");
+        const eyes = getAttr(ink, "Eyes");
+        const season = getAttr(ink, "Season");
+
+        const card = document.createElement("article");
+        card.className = "card";
+
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.alt = name;
+        img.src = `${ORD_BASE}/content/${id}`;
+        thumb.appendChild(img);
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "title-row";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "name";
+        nameEl.textContent = name;
+
+        titleRow.appendChild(nameEl);
+
+        if (shape) {
+          const shapeEl = document.createElement("span");
+          shapeEl.className = "shape-badge";
+          shapeEl.textContent = shape;
+          titleRow.appendChild(shapeEl);
+        }
+
+        meta.appendChild(titleRow);
+
+        const traitsRow = document.createElement("div");
+        traitsRow.className = "traits";
+
+        if (typeof legs !== "undefined" && legs !== null) {
+          const t = document.createElement("span");
+          t.textContent = `Legs: ${legs}`;
+          traitsRow.appendChild(t);
+        }
+        if (typeof eyes !== "undefined" && eyes !== null) {
+          const t = document.createElement("span");
+          t.textContent = `Eyes: ${eyes}`;
+          traitsRow.appendChild(t);
+        }
+        if (typeof season !== "undefined" && season !== null) {
+          const t = document.createElement("span");
+          t.textContent = `Season: ${season}`;
+          traitsRow.appendChild(t);
+        }
+
+        if (traitsRow.children.length) {
+          meta.appendChild(traitsRow);
+        }
+
+        const link = document.createElement("a");
+        link.className = "open-link";
+        link.href = `${ORD_BASE}/inscription/${id}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Open on ordinals.com";
+
+        meta.appendChild(link);
+
+        card.appendChild(thumb);
+        card.appendChild(meta);
+        GRID.appendChild(card);
+      });
+    }
+
+    function applyFilters() {
+      const q = SEARCH.value.trim().toLowerCase();
+      const shapeVal = SHAPE.value;
+
+      filtered = allInks.filter(ink => {
+        const name = (ink.meta?.name || "").toLowerCase();
+        const id = (ink.id || "").toLowerCase();
+        const hasQuery = !q || name.includes(q) || id.includes(q);
+        const inkShape = getAttr(ink, "Shape");
+        const shapeMatch = !shapeVal || inkShape === shapeVal;
+        return hasQuery && shapeMatch;
+      });
+
+      renderGrid();
+    }
+
+    SEARCH.addEventListener("input", () => {
+      applyFilters();
+    });
+    SHAPE.addEventListener("change", () => {
+      applyFilters();
+    });
+
+    loadInks();
+  </script>
+</body>
+</html>
