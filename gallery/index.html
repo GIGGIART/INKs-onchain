@@ -104,6 +104,10 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      color: rgba(245,245,245,.6);
+      font-size: .7rem;
+      text-align: center;
+      padding: .5rem;
     }
     .thumb img {
       width: 100%;
@@ -194,7 +198,7 @@
   <header>
     <h1>INKs Gallery <span class="badge">Bitcoin Ordinals</span></h1>
     <div class="filters">
-      <input id="search" type="search" placeholder="Search by name, id or URL…" />
+      <input id="search" type="search" placeholder="Search by name or id…" />
       <select id="shapeFilter">
         <option value="">All shapes</option>
       </select>
@@ -207,10 +211,15 @@
   </main>
 
   <footer>
-    <span class="pill">Data: data/INKs_traits.json · Using pre-fetched previewUrl from ordinals.com</span>
+    <span class="pill">
+      Data: data/INKs_traits.json · using previewUrl & inscriptionUrl from ordinals.com
+    </span>
   </footer>
 
   <script>
+    // Se rinomini il file in INKs_traits.json, cambia qui:
+    const JSON_URL = "../data/INKs_traits_with_preview.json";
+
     const GRID = document.getElementById("grid");
     const EMPTY = document.getElementById("empty");
     const SEARCH = document.getElementById("search");
@@ -221,10 +230,12 @@
 
     async function loadInks() {
       try {
-        const res = await fetch("../data/INKs_traits.json");
-        if (!res.ok) throw new Error("Cannot load INKs_traits.json");
+        const res = await fetch(JSON_URL);
+        if (!res.ok) throw new Error("Cannot load " + JSON_URL);
         const raw = await res.json();
 
+        // sappiamo che il JSON aggiornato è un array di oggetti
+        // ma per sicurezza gestiamo anche altri formati
         if (Array.isArray(raw)) {
           allInks = raw;
         } else if (Array.isArray(raw.items)) {
@@ -241,67 +252,19 @@
       } catch (err) {
         console.error(err);
         EMPTY.style.display = "block";
-        EMPTY.textContent = "Error loading INKs JSON. Check data/INKs_traits.json.";
-      }
-    }
-
-    function findOrdinalsUrl(obj) {
-      if (!obj || typeof obj !== "object") return null;
-      for (const value of Object.values(obj)) {
-        if (typeof value === "string" && value.includes("ordinals.com")) {
-          return value;
-        }
-        if (typeof value === "object") {
-          const nested = findOrdinalsUrl(value);
-          if (nested) return nested;
-        }
-      }
-      return null;
-    }
-
-    function getInscriptionLink(ink) {
-      if (ink.previewUrl && ink.previewUrl.includes("ordinals.com")) {
-        // da preview -> inscription
-        try {
-          const u = new URL(ink.previewUrl);
-          if (u.pathname.includes("/preview/")) {
-            u.pathname = u.pathname.replace("/preview/", "/inscription/");
-          } else if (u.pathname.includes("/content/")) {
-            u.pathname = u.pathname.replace("/content/", "/inscription/");
-          }
-          return u.toString();
-        } catch {
-          return ink.previewUrl;
-        }
-      }
-      const base = findOrdinalsUrl(ink);
-      if (!base) return "#";
-      try {
-        const u = new URL(base);
-        if (u.pathname.includes("/inscription/")) return u.toString();
-        if (u.pathname.includes("/content/")) {
-          u.pathname = u.pathname.replace("/content/", "/inscription/");
-          return u.toString();
-        }
-        if (u.pathname.includes("/preview/")) {
-          u.pathname = u.pathname.replace("/preview/", "/inscription/");
-          return u.toString();
-        }
-        return u.toString();
-      } catch {
-        return base;
+        EMPTY.textContent = "Error loading INKs JSON. Check " + JSON_URL;
       }
     }
 
     function getName(ink) {
-      if (ink.name) return ink.name;
       if (ink.meta && ink.meta.name) return ink.meta.name;
-      const url = ink.previewUrl || findOrdinalsUrl(ink) || "";
-      if (url) return `INK ${url.slice(-8)}`;
+      if (ink.name) return ink.name;
+      if (ink.id) return "INK " + String(ink.id).slice(0, 8) + "…";
       return "INK";
     }
 
     function getAttr(ink, traitName) {
+      // meta.attributes -> [{trait_type, value}]
       if (ink.meta && Array.isArray(ink.meta.attributes)) {
         const found = ink.meta.attributes.find(
           (a) =>
@@ -310,12 +273,11 @@
         );
         if (found) return found.value;
       }
+      // traits: { Shape: "...", Legs: "2", ... }
       if (ink.traits && traitName in ink.traits) return ink.traits[traitName];
       if (ink.traits && traitName.toLowerCase() in ink.traits) {
         return ink.traits[traitName.toLowerCase()];
       }
-      if (traitName in ink) return ink[traitName];
-      if (traitName.toLowerCase() in ink) return ink[traitName.toLowerCase()];
       return null;
     }
 
@@ -343,7 +305,8 @@
       EMPTY.style.display = "none";
 
       filtered.forEach((ink) => {
-        const imgUrl = ink.previewUrl || findOrdinalsUrl(ink);
+        const imgUrl = ink.previewUrl;
+        const linkUrl = ink.inscriptionUrl || imgUrl || "#";
         const name = getName(ink);
         const shape = getAttr(ink, "Shape");
         const legs = getAttr(ink, "Legs");
@@ -353,6 +316,7 @@
         const card = document.createElement("article");
         card.className = "card";
 
+        // THUMB
         const thumb = document.createElement("div");
         thumb.className = "thumb";
 
@@ -367,9 +331,10 @@
           };
           thumb.appendChild(img);
         } else {
-          thumb.textContent = "No previewUrl";
+          thumb.textContent = "No previewUrl in JSON";
         }
 
+        // META
         const meta = document.createElement("div");
         meta.className = "meta";
 
@@ -415,7 +380,7 @@
 
         const link = document.createElement("a");
         link.className = "open-link";
-        link.href = getInscriptionLink(ink);
+        link.href = linkUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = "Open on ordinals.com";
@@ -434,8 +399,8 @@
 
       filtered = allInks.filter((ink) => {
         const name = getName(ink).toLowerCase();
-        const url = (ink.previewUrl || findOrdinalsUrl(ink) || "").toLowerCase();
-        const hasQuery = !q || name.includes(q) || url.includes(q);
+        const id = (ink.id || "").toLowerCase();
+        const hasQuery = !q || name.includes(q) || id.includes(q);
 
         const inkShape = getAttr(ink, "Shape");
         const shapeMatch = !shapeVal || inkShape === shapeVal;
