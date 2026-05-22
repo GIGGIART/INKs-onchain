@@ -20,7 +20,7 @@ jobs:
 
           mkdir -p data
           curl -L --fail \
-            "https://docs.google.com/spreadsheets/d/1_3fGEW6eIuBZ5-rvNXozxUgj6ioaSSH7X4ncP7UiWF0/edit?gid=491027113#gid=491027113" \
+            "https://drive.google.com/file/d/14UX4LenLYYxEGJaZmfko-zzx4JHpX9uS/view?usp=drive_link" \
             -o data/INKS.csv
 
           test -s data/INKS.csv
