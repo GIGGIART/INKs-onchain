@@ -21,8 +21,6 @@ jobs:
           mkdir -p data
           curl -L --fail \
             "https://drive.google.com/file/d/14UX4LenLYYxEGJaZmfko-zzx4JHpX9uS/view?usp=drive_link" \
-            -o data/INKS.csv
-
           test -s data/INKS.csv
           head -n 1 data/INKS.csv > /dev/null
 
