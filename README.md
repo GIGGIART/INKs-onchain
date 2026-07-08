@@ -10,7 +10,7 @@ Each INK is:
 - **Inscribed on Bitcoin Ordinals** 
 - 100% handmade
 - Customizable onchain
-- The root for a world of Utilities
+- The root for a world of art Onchain
 
 ## 🌐 Official Links
   
